@@ -1,4 +1,4 @@
-import { GuildEmojiManager, MessageReaction, User } from "discord.js";
+import { GuildEmoji, GuildEmojiManager, MessageReaction, ReactionEmoji, User } from "discord.js";
 
 /**
  * The function to be called when a feature is activated.
@@ -8,6 +8,8 @@ export type FeatureCallback = (user: User,reaction: MessageReaction,
 
 export type StopInteractingCallback = (user: User,reaction: MessageReaction,
     stopInteracting: Function, console: any) => void;
+
+export type EmojiResolvable = string | GuildEmoji | ReactionEmoji;
 
 /**
  * A feature is an object with information to make an action from a console.
@@ -21,11 +23,11 @@ export class Feature {
     callback: FeatureCallback;
     removeCallback: StopInteractingCallback;
 
-    constructor(name: string, emojiName: string,
+    constructor(name: string, emojiResolvable: EmojiResolvable,
         description: string, callback: FeatureCallback, removeCallback: StopInteractingCallback = undefined) {
 
             this.name = name;
-            this.emojiName = emojiName;
+            this.emojiName = (typeof emojiResolvable === 'string') ? emojiResolvable : emojiResolvable.id || emojiResolvable.name;
             this.description = description;
             this.callback = callback;
             this.removeCallback = removeCallback;
