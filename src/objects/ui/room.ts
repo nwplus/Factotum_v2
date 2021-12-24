@@ -1,4 +1,5 @@
 import {CategoryChannel, Collection, Guild, GuildChannelCreateOptions, OverwriteResolvable, PermissionOverwriteOptions, Role, Snowflake, TextChannel, User, VoiceChannel} from 'discord.js';
+import { RolePermission } from '../commons';
 
 /**
  * The different channels a room has;
@@ -11,14 +12,6 @@ export interface RoomChannels {
     voiceChannels: Collection<Snowflake, VoiceChannel>
     textChannels: Collection<Snowflake, TextChannel>
     safeChannels: Collection<Snowflake, TextChannel | VoiceChannel>
-}
-
-/**
- * An object with a role and its permissions.
- */
-export interface RolePermission {
-    id: Snowflake;
-    permissions: PermissionOverwriteOptions;
 }
 
 /**
