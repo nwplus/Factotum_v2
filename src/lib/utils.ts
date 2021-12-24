@@ -20,3 +20,10 @@ export function pickRandom<T>(array: readonly T[]): T {
 export function sendLoadingMessage(message: Message): Promise<typeof message> {
 	return send(message, { embeds: [new MessageEmbed().setDescription(pickRandom(RandomLoadingMessage)).setColor('#FF0000')] });
 }
+
+/**
+ * @returns A random color as a hex string
+ */
+export function randomColor() {
+    return Math.floor(Math.random()*16777215).toString(16);
+}
