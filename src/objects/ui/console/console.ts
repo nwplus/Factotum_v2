@@ -1,16 +1,16 @@
-import { Collection, ColorResolvable, DMChannel, HexColorString, Message, MessageEmbed, ReactionCollector, ReactionCollectorOptions, Snowflake, TextChannel, User } from "discord.js";
+import { Collection, ColorResolvable, DMChannel, EmojiIdentifierResolvable, HexColorString, Message, MessageEmbed, ReactionCollector, ReactionCollectorOptions, Snowflake, TextChannel, User } from "discord.js";
 import { Feature } from "./feature";
 import { randomColor } from "../../../lib/utils";
-import { getEmoji } from 'get-random-emoji';
+import RandomEmoji from "@0xadada/random-emoji/src/index";
 
 export interface ConsoleInitialInfo {
     title: string;
     description: string;
-    color: string;
-    fields: Collection<string, string>;
-    features: Collection<string, Feature>;
+    color?: string;
+    fields?: Collection<string, string>;
+    features?: Collection<string, Feature>;
     channel: TextChannel | DMChannel;
-    collectorOptions: ReactionCollectorOptions;
+    collectorOptions?: ReactionCollectorOptions;
 }
 
 export class Console {
@@ -25,14 +25,14 @@ export class Console {
     fields: Collection<string, string>;
     
     /**
-     * <Emoji Name, Button Info>
+     * <Emoji Resolvable, Button Info>
      */
-    features: Collection<string, Feature>;
+    features: Collection<EmojiIdentifierResolvable, Feature>;
 
-    collector: ReactionCollector;
+    collector: ReactionCollector | undefined;
     collectorOptions: ReactionCollectorOptions;
     usersInteracting: Collection<Snowflake, User>;
-    message: Message;
+    message: Message | undefined;
     channel: TextChannel | DMChannel;
     
 
@@ -66,6 +66,7 @@ export class Console {
             .setTitle(this.title)
             .setDescription(this.description);
         
+        // add features to embed
         this.features.forEach(feature => 
             embed.addField(feature.getFieldName(
                 this.channel.type == "GUILD_TEXT" ? this.channel.guild.emojis : undefined), 
@@ -73,18 +74,16 @@ export class Console {
                 )
             );
         
+        // add feilds to embed
         this.fields.forEach((description, name) => embed.addField(name, description));
 
         this.message = await this.channel.send({content: messageText, embeds: [embed]});
 
         this.createReactionCollector(this.message);
-
+        
+        // react to message with feature emojis
         return Promise.all(this.features.map(feature => {
-            return this.message.react(feature.emojiName).catch((reason) => {
-                // the emoji is probably custom we need to find it!
-                let emoji = this.message.guild.emojis.cache.find(guildEmoji => guildEmoji.name === feature.emojiName);
-                return this.message.react(emoji);
-            });
+            return this.addReactionToMessage(feature);
         }));
     }
 
@@ -96,24 +95,22 @@ export class Console {
         // make sure we don't have two collectors going!
         if (this.collector) this.stopConsole();
         
-
-        const filter = (reaction, user) => !user.bot && 
-        this.features.has(reaction.emoji.id || reaction.emoji.name) &&
+        this.collectorOptions.filter = (reaction, user) => !user.bot && 
+        this.features.has(reaction.emoji) &&
         !this.usersInteracting.has(user.id);
-        this.collectorOptions.filter = filter;
 
         this.collector = message.createReactionCollector(this.collectorOptions);
 
         this.collector.on('collect', (reaction, user) => {
             this.usersInteracting.set(user.id, user);
-            let feature = this.features.get(reaction.emoji.id || reaction.emoji.name);
+            let feature = this.features.get(reaction.emoji);
             feature?.callback(user, reaction, () => this.stopInteracting(user), this);
             if (this.channel.type != 'DM' && !feature?.removeCallback)
                 reaction.users.remove(user);
         });
 
         this.collector.on('remove', (reaction, user) => {
-            let feature = this.features.get(reaction.emoji.id || reaction.emoji.name);
+            let feature = this.features.get(reaction.emoji);
             if (feature && feature?.removeCallback) {
                 this.usersInteracting.set(user.id, user);
                 feature?.removeCallback(user, reaction, () => this.stopInteracting(user), this);
@@ -134,10 +131,10 @@ export class Console {
         // if the channel is a DM channel, we can't use custom emojis, so if the emoji is a custom emoji, its an ID,
         // we will grab a random emoji and use that instead
         if (this.channel.type === 'DM' && !isNaN(parseInt(feature.emojiName))) {
-            feature.emojiName = getEmoji();
+            feature.emojiResolvable = RandomEmoji();
         }
 
-        this.features.set(feature.emojiName, feature);
+        this.features.set(feature.emojiResolvable, feature);
 
         if (this.message) {
             return Promise.all(
@@ -146,14 +143,11 @@ export class Console {
                         feature.getFieldName(this.channel.type == "GUILD_TEXT" ? this.channel.guild.emojis : undefined), 
                         feature.getFieldValue())]
                     }),
-                    this.message.react(feature.emojiName).catch(reason => {
-                        // the emoji is probably custom we need to find it!
-                        let emoji = this.message.guild.emojis.cache.find(guildEmoji => guildEmoji.name === feature.emojiName);
-                        this.message.react(emoji);
-                    })
+                    this.addReactionToMessage(feature),
                 ]
             );
         }
+        return Promise.resolve();
     }
     
     /**
@@ -166,10 +160,10 @@ export class Console {
             let isDone = this.features.delete(identifier);
             if (!isDone) {
                 let feature = this.features.find(feature => feature.name === identifier);
-                this.features.delete(feature.emojiName);
+                if (feature) this.features.delete(feature.emojiResolvable);
             }
-        } else if (typeof identifier === 'object') {
-            this.features.delete(identifier?.emojiName);
+        } else if (typeof identifier === 'object' && identifier instanceof Feature) {
+            this.features.delete(identifier.emojiResolvable);
         } else {
             throw Error(`Was not given an identifier to work with when deleting a feature from this console ${this.title}`);
         }
@@ -185,6 +179,7 @@ export class Console {
     addField(name: string, value: string, inline?: boolean) {
         this.fields.set(name, value);
         if(this.message) return this.message.edit({embeds: [this.message.embeds[0].addField(name, value, inline)]});
+        return Promise.resolve();
     }
 
     /**
@@ -195,8 +190,8 @@ export class Console {
     changeColor(color: string) {
         let colorResolvable: ColorResolvable = `#${color}`;
         this.color = colorResolvable;
-
-        return this.message.edit({embeds: [this.message.embeds[0].setColor(this.color)]});
+        if (this.message) return this.message.edit({embeds: [this.message.embeds[0].setColor(this.color)]});
+        return Promise.resolve();
     }
 
     /**
@@ -221,6 +216,23 @@ export class Console {
      */
     stopInteracting(user: User) {
         this.usersInteracting.delete(user.id);
+    }
+
+    /**
+     * Add a feature reaction to the sent message. Will not do anything if the message has not been sent.
+     * @param feature The feature to add reaction to the message
+     * @returns Promise that resolves when the reaction is added
+     */
+    private addReactionToMessage(feature: Feature) {
+        if (!this.message) return Promise.resolve();
+
+        return this.message.react(feature.emojiResolvable).catch(() => {
+            // the emoji is probably custom and its unavailable, so use a random emoji!
+            let emoji = RandomEmoji();
+            // enusre the feature keeps the emoji
+            feature.emojiResolvable = emoji;
+            return this.message!.react(feature.emojiResolvable);
+        });
     }
 
 }
