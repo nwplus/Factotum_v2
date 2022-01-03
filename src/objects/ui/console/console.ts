@@ -206,7 +206,7 @@ export class Console {
      */
     delete() {
         this.stopConsole();
-        this.message?.delete();
+        return this.message?.delete();
     }
 
     /**
