@@ -6,8 +6,8 @@ import { Feature } from "objects/ui/console/feature";
 import { StringPrompt, RolePrompt, ListPrompt } from 'advanced-discord.js-prompts';
 import winston from 'winston';
 import { shuffleArray } from "lib/utils";
-import { sendMsgToChannel } from "lib/discord-utils/discord-utils";
-import { StampManager } from "objects/stamps/stamp-manager";
+import { sendMessageToChannel } from "lib/discord-utils/discord-utils";
+import { StampManager } from "objects/features/stamps/stamp-manager";
 
 
 export interface ActivityInfo {
@@ -66,25 +66,25 @@ export class Activity {
                 name: 'Add Channel',
                 description: 'Add one channel to the activity.',
                 emojiResolvable: '⏫',
-                callback: (user, reaction, stopInteracting, console) => this.addChannel(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.addChannel(console.channel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Remove Channel',
                 description: 'Remove a channel, decide from a list.',
                 emojiResolvable: '⏬',
-                callback: (user, reaction, stopInteracting, console) => this.removeChannel(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.removeChannel(console.channel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Delete',
                 description: 'Delete this activity and its channels.',
                 emojiResolvable: '⛔',
-                callback: (user, reaction, stopInteracting, console) => this.delete(),
+                callback: (_user, _reaction, _stopInteracting, _console) => this.delete(),
             },
             {
                 name: 'Archive',
                 description: 'Archive the activity, text channels are saved.',
                 emojiResolvable: '💼',
-                callback: (user, reaction, stopInteracting, console) => {
+                callback: (_user, _reaction, _stopInteracting, _console) => {
                     let archiveCategory = this.guild.channels.resolve(this.botGuild.channelIDs.archiveCategory);
                     if (archiveCategory.type === 'GUILD_CATEGORY') {
                         return this.archive(archiveCategory);
@@ -96,31 +96,31 @@ export class Activity {
                 name: 'Callback',
                 description: 'Move all users in the activity\'s voice channels back to a specified voice channel.',
                 emojiResolvable: '🔃',
-                callback: (user, reaction, stopInteracting, console) => this.voiceCallBack(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.voiceCallBack(console.channel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Shuffle',
                 description: 'Shuffle all members from one channel to all others in the activity.',
                 emojiResolvable: '🌬️',
-                callback: (user, reaction, stopInteracting, console) => this.shuffle(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.shuffle(console.channel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Role Shuffle',
                 description: 'Shuffle all the members with a specific role from one channel to all others in the activity.',
                 emojiResolvable: '🦜',
-                callback: (user, reaction, stopInteracting, console) => this.roleShuffle(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.roleShuffle(console.channel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Distribute Stamp',
                 description: 'Send a emojiResolvable collector for users to get a stamp.',
                 emojiResolvable: '🏕️',
-                callback: (user, reaction, stopInteracting, console) => this.distributeStamp(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.distributeStamp(console.channel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Rules Lock',
                 description: 'Lock the activity behind rules, users must agree to the rules to access the channels.',
                 emojiResolvable: '🔒',
-                callback: (user, reaction, stopInteracting, console) => this.ruleValidation(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.ruleValidation(console.channel, user.id).then(() => stopInteracting()),
             }
         ];
 
@@ -176,7 +176,12 @@ export class Activity {
         try {
             return this.room.removeRoomChannel(removeChannel);
         } catch (error) {
-            sendMsgToChannel(channel, userId, 'Can\'t remove that channel!', 10);
+            sendMessageToChannel({
+                channel: channel, 
+                message: 'Can\'t remove that channel!', 
+                userId: userId, 
+                timeout: 10
+            });
             return;
         }
     }
@@ -276,7 +281,12 @@ export class Activity {
     async distributeStamp(channel: TextChannel, userId: string) {
 
         if (!this.botGuild.stamps.isEnabled) {
-            sendMsgToChannel(channel, userId, 'The stamp system is not enabled in this server!', 10);
+            sendMessageToChannel({
+                channel: channel, 
+                message: 'The stamp system is not enabled in this server!', 
+                userId: userId, 
+                timeout: 10
+            });
             return;
         }
 
@@ -307,10 +317,10 @@ export class Activity {
         // reaction collector, time is needed in milliseconds, we have it in seconds
         const collector = promptMsg.createReactionCollector({ 
             time: (1000 * this.botGuild.stamps.stampCollectionTime),
-            filter: (reaction, user) => !user.bot,
+            filter: (_reaction, user) => !user.bot,
         });
 
-        collector.on('collect', async (reaction, user) => {
+        collector.on('collect', async (_reaction, user) => {
             // grab the member object of the reacted user
             const member = this.guild.members.resolve(user);
 
@@ -361,7 +371,7 @@ export class Activity {
             filter: (reaction, user) => !user.bot && reaction.emoji.name === joinEmoji,
         });
 
-        collector.on('collect', (reaction, user) => {
+        collector.on('collect', (_reaction, user) => {
             this.room.giveUserAccess(user);
             rulesChannel.permissionOverwrites.create(user.id, { VIEW_CHANNEL: false });
         });

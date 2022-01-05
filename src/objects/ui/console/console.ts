@@ -8,7 +8,7 @@ export interface ConsoleInitialInfo {
     description: string;
     color?: string;
     fields?: Collection<string, string>;
-    features?: Collection<string, Feature>;
+    features?: Collection<EmojiIdentifierResolvable, Feature>;
     channel: TextChannel | DMChannel;
     collectorOptions?: ReactionCollectorOptions;
 }

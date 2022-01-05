@@ -9,10 +9,16 @@ import { ColorResolvable, Guild, GuildMember, Message, MessageEmbed, MessageOpti
  * @param timeout - timeout before delete if any, in seconds
  * @async
  */
- export async function sendMsgToChannel(channel: TextChannel, userId: string, message: string, timeout: number = 0) {
+ export async function sendMessageToChannel({
+     channel, message, userId, timeout = 0
+ }: {channel: TextChannel, message: string, userId?: string, timeout?: number}) {
     winston.loggers.get(channel.guild.id).verbose(`A message has been sent to the channel ${channel.name} for the user with id ${userId} ${timeout === 0 ? 'with no timeout requested' : 'with a ' + timeout + ' second timeout.'}`);
 	
-	const message_1 = await channel.send('<@' + userId + '> ' + message);
+	const message_1 = await channel.send(
+        userId ? 
+        '<@' + userId + '> ' + message :
+        message
+        );
 	await new Promise(() => setTimeout(() => message_1.delete(), timeout * 1000));
 
 	return message_1;

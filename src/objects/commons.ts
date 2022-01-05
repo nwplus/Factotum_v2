@@ -19,10 +19,10 @@ export type StopInteractingCallback = (user: User, reaction: MessageReaction,
 
 export type ShuffleFilter = (member: GuildMember) => boolean;
 
-export interface FeatureData {
+export type FeatureData = {
     name: string;
     emojiResolvable: EmojiIdentifierResolvable;
     description: string;
     callback: FeatureCallback;
-    removeCallback?: StopInteractingCallback | undefined;
+    removeCallback?: StopInteractingCallback;
 }
