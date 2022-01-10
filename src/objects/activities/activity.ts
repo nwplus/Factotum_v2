@@ -47,7 +47,7 @@ export class Activity {
     /**
      * Initialize this activity by creating the channels, adding the features and sending the admin console.
      */
-     async init(): Promise<Activity> {
+     async init() {
         await this.room.init();
 
         this.addDefaultFeatures();
@@ -60,7 +60,7 @@ export class Activity {
     /**
      * Adds the default features to the activity, these features are available to all activities.
      */
-     private addDefaultFeatures() {
+     protected addDefaultFeatures() {
         let localFeatures: FeatureData[] = [
             {
                 name: 'Add Channel',
@@ -157,7 +157,8 @@ export class Activity {
         // channel name
         let name = await StringPrompt.single({ prompt: 'What is the name of the channel?', channel, userId });
 
-        return this.room.addRoomChannel(name, { type: option.name === 'voice' ? 'GUILD_VOICE' : 'GUILD_TEXT' });
+        if (option.name === 'voice') return this.room.addVoiceChannel({name});
+        else return this.room.addTextChannel({name});
     }
 
     /**
@@ -274,9 +275,9 @@ export class Activity {
     }
 
     /**
-     * Will let hackers get a stamp for attending the activity.
-     * @param {TextChannel} channel - channel to prompt user for specified voice channel
-     * @param {String} userId - user to prompt for specified voice channel
+     * Will let hackers get a stamp for attending the activity. Will ask user where to send the stamp collector
+     * @param {TextChannel} channel - channel to prompt user for specified text channel to send stamp collector
+     * @param {String} userId - user to prompt for specified text channel
      */
     async distributeStamp(channel: TextChannel, userId: string) {
 
@@ -284,7 +285,6 @@ export class Activity {
             sendMessageToChannel({
                 channel: channel, 
                 message: 'The stamp system is not enabled in this server!', 
-                userId: userId, 
                 timeout: 10
             });
             return;
@@ -301,8 +301,8 @@ export class Activity {
 
         // send embed to general text or prompt for channel
         let promptMsg: Message;
-        if (this.room.channels.generalText && (await this.room.channels.generalText.fetch(true))) {
-            promptMsg = await this.room.channels.generalText.send({embeds: [promptEmbed]});
+        if (await this.room.generalText.fetch(true)) {
+            promptMsg = await this.room.generalText.send({embeds: [promptEmbed]});
         } else {
             let stampChannel = await ListPrompt.singleListChooser({
                 prompt: 'What channel should the stamp distribution go?',

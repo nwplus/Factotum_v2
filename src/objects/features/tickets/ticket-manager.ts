@@ -1,7 +1,7 @@
 import { Collection, EmojiIdentifierResolvable, MessageEmbed, Role, Snowflake, TextChannel, User } from "discord.js";
 import { Console } from "../../ui/console/console";
 import { Ticket, TicketStatus } from "./ticket";
-import { Activity } from "../../activities/activity";
+import type { Activity } from "../../activities/activity";
 import { MessagePrompt } from "advanced-discord.js-prompts";
 import winston from "winston";
 import { Feature } from "../../ui/console/feature";
@@ -28,7 +28,7 @@ export type TicketCreatorInfo = {
     /** the channel where users can create a ticket */
     channel: TextChannel;
     /** the console used to let users create tickets */
-    console: Console;
+    console?: Console;
 }
 
 export type ReminderInfo = {
@@ -116,7 +116,11 @@ export type MultiRoleInfo = {
             isEnabled : false,
             multiRoleSelector : null,
         };
+    }
 
+    get ticketCreatorConsole() {
+        if (!this.ticketCreatorInfo.console) throw "The console has not been sent for this ticket!";
+        return this.ticketCreatorInfo.console;
     }
 
     /**
@@ -130,7 +134,7 @@ export type MultiRoleInfo = {
             new Feature({
                 name: 'General Ticket',
                 description: 'A general ticket aimed to all helpers.',
-                emoji: this.ticketDispatcherInfo.mainHelperInfo.emoji,
+                emojiResolvable: this.ticketDispatcherInfo.mainHelperInfo.emoji,
                 callback: (user, _reaction, stopInteracting, console) => this.startTicketCreationProcess(user, this.ticketDispatcherInfo.mainHelperInfo.role, console.channel).then(() => stopInteracting()),
             })
         ];
@@ -149,13 +153,13 @@ export type MultiRoleInfo = {
      * @param emoji 
      */
     addTicketType(role: Role, typeName: string, emoji: EmojiIdentifierResolvable) {
-        return this.ticketCreatorInfo.console.addFeature(
+        return this.ticketCreatorConsole.addFeature(
             new Feature({
                 name: `Question about ${typeName}`,
                 description: '---------------------------------',
-                emoji: emoji,
+                emojiResolvable: emoji,
                 callback: (user, _reaction, stopInteracting, console) => {
-                    this.startTicketCreationProcess(user, role, console.channel).then(() => stopInteracting());
+                    return this.startTicketCreationProcess(user, role, console.channel).then(() => stopInteracting());
                 }
             })
         );
@@ -210,7 +214,7 @@ export type MultiRoleInfo = {
 
         this.ticketCount++;
 
-        return ticket.setStatus(TicketStatus.new);
+        return ticket.setStatus(TicketStatus.open);
     }
 
     /**
@@ -221,8 +225,8 @@ export type MultiRoleInfo = {
         // if reminders are on, set a timeout to reminder the main role of this ticket if the ticket is still new
         if (this.ticketDispatcherInfo.reminderInfo.isEnabled) {
             let timeout = setTimeout(() => {
-                if (ticket.status === TicketStatus.new) {
-                    ticket.consoles.ticketManager.changeColor('#ff5736');
+                if (ticket.status === TicketStatus.open) {
+                    ticket.ticketManagerConsole.changeColor('#ff5736');
                     sendMessageToChannel({
                         channel: this.ticketDispatcherInfo.channel,
                         message: `Hello <@&${this.ticketDispatcherInfo.mainHelperInfo.role.id}> ticket number ${ticket.id} still needs help!`,
@@ -296,9 +300,13 @@ export type MultiRoleInfo = {
     removeTicket(ticketId: number) {
         // remove the reminder for this ticket if reminders are on
         if (this.ticketDispatcherInfo.reminderInfo.isEnabled && this.ticketDispatcherInfo.reminderInfo.reminders.has(ticketId)) {
-            clearTimeout(this.ticketDispatcherInfo.reminderInfo.reminders.get(ticketId));
+            let timeout = this.ticketDispatcherInfo.reminderInfo.reminders.get(ticketId);
+            if (timeout) clearTimeout(timeout);
             this.ticketDispatcherInfo.reminderInfo.reminders.delete(ticketId);
         }
-        this.tickets.get(ticketId).setStatus(TicketStatus.closed, 'ticket manager closed the ticket');
+        let ticket = this.tickets.get(ticketId);
+        if (ticket) {
+            ticket.setStatus(TicketStatus.closed, 'ticket manager closed the ticket');
+        }
     }
 }

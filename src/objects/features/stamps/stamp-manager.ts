@@ -15,7 +15,7 @@ export class StampManager {
      */
      static async distributeStamp(activity: Activity, botGuild: BotGuildModel, time: number = 60) {
 
-        winston.loggers.get(activity.guild.id).event(`Activity named ${activity.name} is distributing stamps.`, {event: 'Activity Manager'});
+        // winston.loggers.get(activity.guild.id).event(`Activity named ${activity.name} is distributing stamps.`, {event: 'Activity Manager'});
         
         // The users already seen by this stamp distribution.
         let seenUsers = new Collection();
@@ -24,13 +24,13 @@ export class StampManager {
             .setColor(botGuild.colors.embedColor)
             .setTitle('React within ' + time + ' seconds of the posting of this message to get a stamp for ' + activity.name + '!');
 
-        let promptMsg = await activity.room.channels.generalText?.send({embeds: [promptEmbed]})!; // TODO handle null value when activity is not INIT
+        let promptMsg = await activity.room.generalText.send({embeds: [promptEmbed]});
         promptMsg.react('👍');
 
         // reaction collector, time is needed in milliseconds, we have it in seconds
-        const collector = promptMsg.createReactionCollector({ time: (1000 * time), filter: (reaction, user) => !user.bot });
+        const collector = promptMsg.createReactionCollector({ time: (1000 * time), filter: (_reaction, user) => !user.bot });
 
-        collector.on('collect', async (reaction, user) => {
+        collector.on('collect', async (_reaction, user) => {
             // grab the member object of the reacted user
             const member = activity.guild.members.resolve(user);
 
@@ -41,8 +41,8 @@ export class StampManager {
         });
 
         // edit the message to closed when the collector ends
-        collector.on('end', collected => {
-            winston.loggers.get(activity.guild.id).event(`Activity named ${activity.name} stamp distribution has stopped.`, {event: 'Activity Manager'});
+        collector.on('end', _collected => {
+            // winston.loggers.get(activity.guild.id).event(`Activity named ${activity.name} stamp distribution has stopped.`, {event: 'Activity Manager'});
             if (promptMsg.deletable) {
                 promptMsg.edit({embeds: [promptEmbed.setTitle('Time\'s up! No more responses are being collected. Thanks for participating in ' + activity.name + '!')]});
             }
@@ -69,26 +69,26 @@ export class StampManager {
             addRoleToMember(member, botGuild.stamps.stamp0thRoleId);
             sendMessageToMember(member, 'I did not find an existing stamp role for you so I gave you one for attending '
                 + activityName + '. Please contact an admin if there was a problem.', true);
-            winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} tried to give a stamp to the user with id ${member.id} but he has no stamp, I gave them the first stamp!`, {event: 'Activity Manager'});
+            // winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} tried to give a stamp to the user with id ${member.id} but he has no stamp, I gave them the first stamp!`, {event: 'Activity Manager'});
             return;
         }
 
         let stampNumber = botGuild.stamps.stampRoleIDs.get(role.id);
         if (stampNumber === botGuild.stamps.stampRoleIDs.size - 1) {
             sendMessageToMember(member, 'You already have the maximum allowed number of stamps!', true);
-            winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} tried to give a stamp to the user with id ${member.id} but he is already in the max stamp ${stampNumber}`, {event: 'Activity Manager'});
+            // winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} tried to give a stamp to the user with id ${member.id} but he is already in the max stamp ${stampNumber}`, {event: 'Activity Manager'});
             return;
         }
         let newRoleID;
 
-        botGuild.stamps.stampRoleIDs.forEach((num, key, map) => {
+        botGuild.stamps.stampRoleIDs.forEach((num, key, _map) => {
             if (num === stampNumber + 1) newRoleID = key;
         });
 
         if (newRoleID != undefined) {
             replaceRoleToMember(member, role.id, newRoleID);
             sendMessageToMember(member, 'You have received a higher stamp for attending ' + activityName + '!', true);
-            winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} gave a stamp to the user with id ${member.id} going from stamp number ${stampNumber} to ${stampNumber + 1}`, {event: 'Activity Manager'});
+            // winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} gave a stamp to the user with id ${member.id} going from stamp number ${stampNumber} to ${stampNumber + 1}`, {event: 'Activity Manager'});
         }
     }
 

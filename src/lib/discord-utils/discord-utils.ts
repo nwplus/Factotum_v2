@@ -36,14 +36,14 @@ import { ColorResolvable, Guild, GuildMember, Message, MessageEmbed, MessageOpti
  */
  export function sendMessageToMember(member: GuildMember, message: string | MessagePayload | MessageOptions, isDelete: boolean = false) {
     return member.send(message).then(msg => {
-        winston.loggers.get(member?.guild?.id || 'main').verbose(`A DM message was sent to user with id ${member.id}.`);
+        winston.loggers.get(member.guild.id || 'main').verbose(`A DM message was sent to user with id ${member.id}.`);
         if (isDelete === true) {
             return new Promise(() => setTimeout(() => msg.delete(), 6000)) as Promise<Message<boolean>>;
         }
         return msg;
     }).catch(async error => {
         if (error.code === 50007) {
-            winston.loggers.get(member?.guild?.id || 'main').warning(`A DM message was sent to user with id ${member.id} but failed, he has been asked to fix this problem!`);
+            winston.loggers.get(member.guild.id || 'main').warning(`A DM message was sent to user with id ${member.id} but failed, he has been asked to fix this problem!`);
             /* let botGuild; // TODO fix
             if (member?.guild) botGuild = await BotGuild.findById(member.guild.id);
             else {

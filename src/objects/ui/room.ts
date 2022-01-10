@@ -1,4 +1,4 @@
-import {CategoryChannel, Collection, Guild, GuildChannelCreateOptions, OverwriteResolvable, Role, Snowflake, TextChannel, User, VoiceChannel} from 'discord.js';
+import {CategoryChannel, Collection, Guild, GuildChannel, GuildChannelCreateOptions, OverwriteResolvable, Role, Snowflake, TextChannel, User, VoiceChannel} from 'discord.js';
 import type { RolePermission } from '../commons';
 
 /**
@@ -11,7 +11,7 @@ export interface RoomChannels {
     nonLockedChannel?: TextChannel;
     voiceChannels: Collection<Snowflake, VoiceChannel>
     textChannels: Collection<Snowflake, TextChannel>
-    safeChannels: Collection<Snowflake, TextChannel | VoiceChannel>
+    safeChannels: Collection<Snowflake, GuildChannel>
 }
 
 /**
@@ -29,6 +29,7 @@ export class Room {
     isLocked: boolean;
     timeCreated: Date;
     channels: RoomChannels;
+    private initialized: boolean;
 
     constructor(guild: Guild, botGuild: any, name: string, 
         rolesAllowed: Collection<Snowflake, Role> = new Collection(), 
@@ -52,6 +53,21 @@ export class Room {
                 textChannels: new Collection(),
                 safeChannels: new Collection(),
             };
+
+            this.initialized = false;
+    }
+
+    get category() {
+        if (!this.initialized) throw "The Room has not been initialized!";
+        return this.channels.category!;
+    }
+    get generalVoice() {
+        if (!this.initialized) throw "The Room has not been initialized!";
+        return this.channels.generalVoice!;
+    }
+    get generalText() {
+        if (!this.initialized) throw "The Room has not been initialized!";
+        return this.channels.generalText!;
     }
 
     /**
@@ -60,21 +76,22 @@ export class Room {
      */
     async init() {
         this.channels.category = await this.createCategory();
-        this.channels.generalText = await this.addRoomChannel(
-            this.name.length < 12 ? `${this.name}-banter` : '🖌️activity-banter', 
-            {
-                parent: this.channels.category,
+        this.channels.generalText = await this.addRoomChannel({
+            name: this.name.length < 12 ? `${this.name}-banter` : '🖌️activity-banter', 
+            info: {
+                parent: this.category,
                 type: 'GUILD_TEXT',
                 topic: 'A general banter channel to be used to communicate with other members, mentors, or staff. The !ask command is available for questions.',
             }
-        ) as TextChannel;
-        this.channels.generalVoice = await this.addRoomChannel(
-            this.name.length < 12 ? `${this.name}-room` : '🗣️activity-room', 
-            {
-                parent: this.channels.category,
+        }) as TextChannel;
+        this.channels.generalVoice = await this.addRoomChannel({
+            name: this.name.length < 12 ? `${this.name}-room` : '🗣️activity-room', 
+            info: {
+                parent: this.category,
                 type: 'GUILD_VOICE',
             }
-        ) as VoiceChannel;
+        }) as VoiceChannel;
+        this.initialized = true;
         return this;
     }
 
@@ -103,36 +120,58 @@ export class Room {
     }
 
     /**
-     * Adds a channels to the room.
+     * Adds a channels to the room. A text channel by default!
      * @param name - name of the channel to create
      * @param info - one of voice or text
      * @param permissions - the permissions per role to be added to this channel after creation.
      * @param isSafe - true if the channel is safe and cant be removed
      */
-     async addRoomChannel(name: string, info: GuildChannelCreateOptions = {}, 
-        permissions: RolePermission[] = [], isSafe:boolean = false) {
-        info.parent = info?.parent || this.channels.category;
+     private async addRoomChannel({name, info = {}, permissions = [], isSafe = false} : 
+        {name: string, info?: GuildChannelCreateOptions, permissions?: RolePermission[], isSafe?: boolean}) {
+        info.parent = info?.parent || this.category;
         info.type = info?.type || 'GUILD_TEXT';
         info.permissionOverwrites = permissions;
 
         let channel = await this.guild.channels.create(name, info);
 
-        if (channel.type == 'GUILD_TEXT' || channel.type == 'GUILD_VOICE') {
-            if (isSafe) this.channels.safeChannels.set(channel.id, channel);
-        }
+        if (isSafe) this.channels.safeChannels.set(channel.id, channel);
 
         // add channel to correct list
         if (channel.type == 'GUILD_TEXT') {
             this.channels.textChannels.set(channel.id, channel);
-            return channel as TextChannel;
         }
         else if (channel.type == 'GUILD_VOICE') {
             this.channels.voiceChannels.set(channel.id, channel);
-            return channel as VoiceChannel;
-        } else {
-            return Promise.resolve();
         }
+        return channel;
     }
+
+    /**
+     * Adds a text channel to the room.
+     * @param name - name of the channel to create
+     * @param info - one of voice or text
+     * @param permissions - the permissions per role to be added to this channel after creation.
+     * @param isSafe - true if the channel is safe and cant be removed
+     */
+    async addTextChannel({name, info = {}, permissions = [], isSafe = false} : 
+        {name: string, info?: GuildChannelCreateOptions, permissions?: RolePermission[], isSafe?: boolean}) {
+            info.type = 'GUILD_TEXT'
+            return await this.addRoomChannel({name, info, permissions, isSafe}) as TextChannel;
+    }
+
+    /**
+     * Adds a voice channel to the room.
+     * @param name - name of the channel to create
+     * @param info - one of voice or text
+     * @param permissions - the permissions per role to be added to this channel after creation.
+     * @param isSafe - true if the channel is safe and cant be removed
+     */
+    async addVoiceChannel({name, info = {}, permissions = [], isSafe = false} : 
+        {name: string, info?: GuildChannelCreateOptions, permissions?: RolePermission[], isSafe?: boolean}) {
+            info.type = 'GUILD_VOICE'
+            return await this.addRoomChannel({name, info, permissions, isSafe}) as VoiceChannel;
+    }
+
 
     /**
      * Remove a channel from the room.
@@ -157,10 +196,10 @@ export class Room {
      */
     delete() {
         // only delete channels if they were created!
-        if (this.channels?.category) {
-            var listOfChannels = Array.from(this.channels.category.children.values());
+        if (this.initialized) {
+            var listOfChannels = Array.from(this.category.children.values());
 
-            return Promise.all([listOfChannels.map(channel => channel.delete()), this.channels.category.delete()]);
+            return Promise.all([listOfChannels.map(channel => channel.delete()), this.category.delete()]);
         }
         return Promise.resolve();
     }
@@ -173,9 +212,9 @@ export class Room {
     archive(archiveCategory: CategoryChannel) {
         // move all text channels to the archive and rename with activity name
         // remove all voice channels in the category one at a time to not get a UI glitch
-        if (!this.channels.category) return;
+        if (!this.initialized) return;
 
-        var listOfChannels = Array.from(this.channels.category.children.values());
+        var listOfChannels = Array.from(this.category.children.values());
 
         return Promise.all([
             listOfChannels.map(channel => {
@@ -185,7 +224,7 @@ export class Room {
                 }
                 return channel.delete();
             }),
-            this.channels.category.delete()
+            this.category.delete()
         ]);
     }
 
@@ -195,17 +234,17 @@ export class Room {
      * @returns The non locked channel where users can unlock the room.
      */
     async lockRoom() {
-        if (!this.channels.category) return Promise.resolve();
+        if (!this.initialized) return Promise.resolve();
 
         // set category private
         this.rolesAllowed.forEach((role) => this.channels!.category!.permissionOverwrites.create(role, { VIEW_CHANNEL: false }));
 
         /** @type {TextChannel} */
-        this.channels.nonLockedChannel = await this.addRoomChannel(
-            'Activity Rules START HERE', 
-            { type: 'GUILD_TEXT' }, 
-            this.rolesAllowed.map((role) => ({ id: role.id, permissions: { VIEW_CHANNEL: true, SEND_MESSAGES: false, }})), 
-            true) as TextChannel;
+        this.channels.nonLockedChannel = await this.addRoomChannel({
+            name: 'Activity Rules START HERE', 
+            info: { type: 'GUILD_TEXT' }, 
+            permissions: this.rolesAllowed.map((role) => ({ id: role.id, permissions: { VIEW_CHANNEL: true, SEND_MESSAGES: false, }})), 
+            isSafe: true}) as TextChannel;
         this.channels.safeChannels.set(this.channels.nonLockedChannel.id, this.channels.nonLockedChannel);
 
         this.isLocked = true;
@@ -223,7 +262,7 @@ export class Room {
         if (this.isLocked && this.channels.nonLockedChannel) {
             return this.channels.nonLockedChannel.permissionOverwrites.create(role.id, { VIEW_CHANNEL: true, SEND_MESSAGES: false });
         } else {
-            if (this.channels.category) return this.channels.category.permissionOverwrites.create(role.id, { VIEW_CHANNEL: true });
+            if (this.initialized) return this.category.permissionOverwrites.create(role.id, { VIEW_CHANNEL: true });
             this.rolesAllowed.set(role.id, role);
             return Promise.resolve();
         }
@@ -235,7 +274,7 @@ export class Room {
      */
      giveUserAccess(user: User) {
         this.usersAllowed.set(user.id, user);
-        if (this.channels.category) return this.channels.category.permissionOverwrites.create(user.id, { VIEW_CHANNEL: true, SEND_MESSAGES: true });
+        if (this.initialized) return this.category.permissionOverwrites.create(user.id, { VIEW_CHANNEL: true, SEND_MESSAGES: true });
         this.usersAllowed.set(user.id, user);
         return Promise.resolve();
     }
@@ -246,7 +285,7 @@ export class Room {
      */
     removeUserAccess(user: User) {
         this.usersAllowed.delete(user.id);
-        if (this.channels.category) return this.channels.category.permissionOverwrites.create(user.id, { VIEW_CHANNEL: false, SEND_MESSAGES: false});
+        if (this.initialized) return this.category.permissionOverwrites.create(user.id, { VIEW_CHANNEL: false, SEND_MESSAGES: false});
         this.usersAllowed.delete(user.id);
         return Promise.resolve();
     }

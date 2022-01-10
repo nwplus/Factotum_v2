@@ -29,10 +29,13 @@ export class Console {
      */
     features: Collection<EmojiIdentifierResolvable, Feature>;
 
-    collector: ReactionCollector | undefined;
+    private _collector?: ReactionCollector;
+    private _message?: Message;
+
+    initialized: boolean;
+
     collectorOptions: ReactionCollectorOptions;
     usersInteracting: Collection<Snowflake, User>;
-    message: Message | undefined;
     channel: TextChannel | DMChannel;
     
 
@@ -52,6 +55,17 @@ export class Console {
             
             features.forEach(feature => this.addFeature(feature));
             fields.forEach((name, description) => this.addField(name, description));
+
+            this.initialized = false;
+    }
+
+    get collector() {
+        if (!this.initialized) throw "The console has not been initialized!";
+        return this._collector!;
+    }
+    get message() {
+        if (!this.initialized) throw "The console has not been initialized!";
+        return this._message!;
     }
 
     /**
@@ -77,9 +91,11 @@ export class Console {
         // add feilds to embed
         this.fields.forEach((description, name) => embed.addField(name, description));
 
-        this.message = await this.channel.send({content: messageText, embeds: [embed]});
+        this._message = await this.channel.send({content: messageText, embeds: [embed]});
 
-        this.createReactionCollector(this.message);
+        this.createReactionCollector(this._message);
+
+        this.initialized = true;
         
         // react to message with feature emojis
         return Promise.all(this.features.map(feature => {
@@ -99,9 +115,9 @@ export class Console {
         this.features.has(reaction.emoji) &&
         !this.usersInteracting.has(user.id);
 
-        this.collector = message.createReactionCollector(this.collectorOptions);
+        this._collector = message.createReactionCollector(this.collectorOptions);
 
-        this.collector.on('collect', (reaction, user) => {
+        this._collector.on('collect', (reaction, user) => {
             this.usersInteracting.set(user.id, user);
             let feature = this.features.get(reaction.emoji);
             feature?.callback(user, reaction, () => this.stopInteracting(user), this);
@@ -109,7 +125,7 @@ export class Console {
                 reaction.users.remove(user);
         });
 
-        this.collector.on('remove', (reaction, user) => {
+        this._collector.on('remove', (reaction, user) => {
             let feature = this.features.get(reaction.emoji);
             if (feature && feature?.removeCallback) {
                 this.usersInteracting.set(user.id, user);

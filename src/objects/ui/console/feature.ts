@@ -12,7 +12,7 @@ export class Feature {
     emojiResolvable: EmojiIdentifierResolvable;
     description: string;
     callback: FeatureCallback;
-    removeCallback: StopInteractingCallback | undefined;
+    removeCallback?: StopInteractingCallback;
 
     constructor({name, emojiResolvable, description, callback, removeCallback = undefined}: FeatureData) {
             this.name = name;
