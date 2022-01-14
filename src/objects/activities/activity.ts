@@ -1,20 +1,21 @@
 import { Collection, Guild, Role, TextChannel, CategoryChannel, MessageEmbed, VoiceChannel, Message, Snowflake } from "discord.js";
-import { Room } from "objects/ui/room";
-import { Console } from "objects/ui/console/console";
-import type { FeatureData, ShuffleFilter } from "objects/commons";
-import { Feature } from "objects/ui/console/feature";
+import { Room } from "../../objects/ui/room";
+import { Console } from "../../objects/ui/console/console";
+import type { FeatureData, ShuffleFilter } from "../../objects/commons";
+import { Feature } from "../../objects/ui/console/feature";
 import { StringPrompt, RolePrompt, ListPrompt } from 'advanced-discord.js-prompts';
 import winston from 'winston';
-import { shuffleArray } from "lib/utils";
-import { sendMessageToChannel } from "lib/discord-utils/discord-utils";
-import { StampManager } from "objects/features/stamps/stamp-manager";
+import { shuffleArray } from "../../lib/utils";
+import { sendMessageToChannel } from "../../lib/discord-utils/discord-utils";
+import { StampManager } from "../../objects/features/stamps/stamp-manager";
+import type { BotGuild } from "../../objects/bot-guild";
 
 
 export interface ActivityInfo {
     activityName: string;
     guild: Guild;
     roleParticipants: Collection<string, Role>;
-    botGuild: any; // TODO change
+    botGuild: BotGuild;
 }
 
 /**
@@ -30,12 +31,12 @@ export class Activity {
     guild: Guild;
     room: Room;
     adminConsole: Console;
-    botGuild: any; // TODO change
+    botGuild: BotGuild;
 
     constructor({activityName, guild, roleParticipants, botGuild}:ActivityInfo) {
         this.name = activityName;
         this.guild = guild;
-        this.room = new Room(guild, botGuild, activityName, roleParticipants);
+        this.room = new Room(guild, activityName, roleParticipants);
         this.adminConsole = new Console({
             title: `Activity ${activityName} Console`,
             description: 'This activity\'s information can be found below, you can also find the features available.',
@@ -66,13 +67,13 @@ export class Activity {
                 name: 'Add Channel',
                 description: 'Add one channel to the activity.',
                 emojiResolvable: '⏫',
-                callback: (user, _reaction, stopInteracting, console) => this.addChannel(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.addChannel(console.channel as TextChannel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Remove Channel',
                 description: 'Remove a channel, decide from a list.',
                 emojiResolvable: '⏬',
-                callback: (user, _reaction, stopInteracting, console) => this.removeChannel(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.removeChannel(console.channel as TextChannel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Delete',
@@ -86,7 +87,7 @@ export class Activity {
                 emojiResolvable: '💼',
                 callback: (_user, _reaction, _stopInteracting, _console) => {
                     let archiveCategory = this.guild.channels.resolve(this.botGuild.channelIDs.archiveCategory);
-                    if (archiveCategory.type === 'GUILD_CATEGORY') {
+                    if (archiveCategory && archiveCategory.type === 'GUILD_CATEGORY') {
                         return this.archive(archiveCategory);
                     }
                     else return Promise.resolve();
@@ -96,31 +97,31 @@ export class Activity {
                 name: 'Callback',
                 description: 'Move all users in the activity\'s voice channels back to a specified voice channel.',
                 emojiResolvable: '🔃',
-                callback: (user, _reaction, stopInteracting, console) => this.voiceCallBack(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.voiceCallBack(console.channel as TextChannel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Shuffle',
                 description: 'Shuffle all members from one channel to all others in the activity.',
                 emojiResolvable: '🌬️',
-                callback: (user, _reaction, stopInteracting, console) => this.shuffle(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.shuffle(console.channel as TextChannel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Role Shuffle',
                 description: 'Shuffle all the members with a specific role from one channel to all others in the activity.',
                 emojiResolvable: '🦜',
-                callback: (user, _reaction, stopInteracting, console) => this.roleShuffle(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.roleShuffle(console.channel as TextChannel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Distribute Stamp',
                 description: 'Send a emojiResolvable collector for users to get a stamp.',
                 emojiResolvable: '🏕️',
-                callback: (user, _reaction, stopInteracting, console) => this.distributeStamp(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.distributeStamp(console.channel as TextChannel, user.id).then(() => stopInteracting()),
             },
             {
                 name: 'Rules Lock',
                 description: 'Lock the activity behind rules, users must agree to the rules to access the channels.',
                 emojiResolvable: '🔒',
-                callback: (user, _reaction, stopInteracting, console) => this.ruleValidation(console.channel, user.id).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.ruleValidation(console.channel as TextChannel, user.id).then(() => stopInteracting()),
             }
         ];
 
@@ -168,11 +169,14 @@ export class Activity {
      * @async
      */
     async removeChannel(channel: TextChannel, userId: string) {
-        let removeChannel: TextChannel = await ListPrompt.singleListChooser({
+        let removeChannel = await ListPrompt.singleListChooser<TextChannel | VoiceChannel>({
             prompt: 'What channel should be removed?',
             channel: channel,
             userId: userId
-        }, Array.from(this.room.channels!.category!.children.values()));
+        }, 
+        Array.from(this.room.channels!.category!
+            .children.filter(channel => channel.type === 'GUILD_TEXT' || channel.type === 'GUILD_VOICE').values()) as Array<TextChannel | VoiceChannel>
+        );
 
         try {
             return this.room.removeRoomChannel(removeChannel);
@@ -309,7 +313,7 @@ export class Activity {
                 channel: channel,
                 userId: userId
             }, Array.from(this.room.channels.textChannels.values()));
-            promptMsg = await stampChannel.send(promptEmbed);
+            promptMsg = await stampChannel.send({embeds: [promptEmbed]});
         }
 
         promptMsg.react('👍');

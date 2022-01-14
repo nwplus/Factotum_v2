@@ -108,7 +108,7 @@ export type PollInfo = {
         });
 
         this.botGuild.blackList.set(this._assistanceChannel.id, 3000);
-        this.botGuild.save();
+        // this.botGuild.save(); TODO USE
 
         if (this.isLowTechSolution) {
             this._ticketManager = new TicketManager(this, {

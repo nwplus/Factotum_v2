@@ -1,6 +1,6 @@
 import type { EmojiIdentifierResolvable, GuildEmojiManager } from "discord.js";
-import RandomEmoji from "@0xadada/random-emoji/src/index";
-import type { FeatureCallback, StopInteractingCallback, FeatureData } from "objects/commons";
+import { RandomEmoji } from "../../../lib/utils";
+import type { FeatureCallback, StopInteractingCallback, FeatureData } from "../../../objects/commons";
 
 /**
  * A feature is an object with information to make an action from a console.
@@ -49,6 +49,10 @@ export class Feature {
      */
     get emojiName(): string {
         return (typeof this.emojiResolvable === 'string') ? this.emojiResolvable : this.emojiResolvable.id || this.emojiResolvable.name || RandomEmoji();
+    }
+
+    get emojiId(): string {
+        return (typeof this.emojiResolvable === 'string') ? this.emojiResolvable : this.emojiResolvable.name || this.emojiResolvable.identifier;
     }
 
 

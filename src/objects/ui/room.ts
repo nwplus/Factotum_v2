@@ -25,13 +25,12 @@ export class Room {
     guild: Guild;
     rolesAllowed: Collection<Snowflake, Role>
     usersAllowed: Collection<Snowflake, User>
-    botGuild: any; // TODO change
     isLocked: boolean;
     timeCreated: Date;
     channels: RoomChannels;
     private initialized: boolean;
 
-    constructor(guild: Guild, botGuild: any, name: string, 
+    constructor(guild: Guild, name: string, 
         rolesAllowed: Collection<Snowflake, Role> = new Collection(), 
         usersAllowed: Collection<Snowflake, User> = new Collection()) {
             
@@ -41,7 +40,6 @@ export class Room {
             this.name = name.split(' ').join('-').trim().replace(/[^0-9a-zA-Z-]/g, '').toLowerCase();
 
             this.guild = guild;
-            this.botGuild = botGuild;
             this.rolesAllowed = rolesAllowed;
             this.usersAllowed = usersAllowed
 
@@ -79,7 +77,7 @@ export class Room {
         this.channels.generalText = await this.addRoomChannel({
             name: this.name.length < 12 ? `${this.name}-banter` : '🖌️activity-banter', 
             info: {
-                parent: this.category,
+                parent: this.channels.category,
                 type: 'GUILD_TEXT',
                 topic: 'A general banter channel to be used to communicate with other members, mentors, or staff. The !ask command is available for questions.',
             }
@@ -87,7 +85,7 @@ export class Room {
         this.channels.generalVoice = await this.addRoomChannel({
             name: this.name.length < 12 ? `${this.name}-room` : '🗣️activity-room', 
             info: {
-                parent: this.category,
+                parent: this.channels.category,
                 type: 'GUILD_VOICE',
             }
         }) as VoiceChannel;
@@ -106,7 +104,7 @@ export class Room {
         
         let overwrites: OverwriteResolvable[] = [
             {
-                id: this.botGuild.roleIDs.everyoneRole,
+                id: this.guild.roles.everyone.id,
                 deny: ['VIEW_CHANNEL'],
             }];
         
@@ -263,7 +261,6 @@ export class Room {
             return this.channels.nonLockedChannel.permissionOverwrites.create(role.id, { VIEW_CHANNEL: true, SEND_MESSAGES: false });
         } else {
             if (this.initialized) return this.category.permissionOverwrites.create(role.id, { VIEW_CHANNEL: true });
-            this.rolesAllowed.set(role.id, role);
             return Promise.resolve();
         }
     }
@@ -275,7 +272,6 @@ export class Room {
      giveUserAccess(user: User) {
         this.usersAllowed.set(user.id, user);
         if (this.initialized) return this.category.permissionOverwrites.create(user.id, { VIEW_CHANNEL: true, SEND_MESSAGES: true });
-        this.usersAllowed.set(user.id, user);
         return Promise.resolve();
     }
 
@@ -285,8 +281,7 @@ export class Room {
      */
     removeUserAccess(user: User) {
         this.usersAllowed.delete(user.id);
-        if (this.initialized) return this.category.permissionOverwrites.create(user.id, { VIEW_CHANNEL: false, SEND_MESSAGES: false});
-        this.usersAllowed.delete(user.id);
+        if (this.initialized) return this.category.permissionOverwrites.edit(user.id, { VIEW_CHANNEL: false, SEND_MESSAGES: false});
         return Promise.resolve();
     }
 

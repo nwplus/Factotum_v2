@@ -1,7 +1,7 @@
 import { Collection, ColorResolvable, DMChannel, EmojiIdentifierResolvable, HexColorString, Message, MessageEmbed, ReactionCollector, ReactionCollectorOptions, Snowflake, TextChannel, User } from "discord.js";
 import { Feature } from "./feature";
 import { randomColor } from "../../../lib/utils";
-import RandomEmoji from "@0xadada/random-emoji/src/index";
+import { RandomEmoji } from "../../../lib/utils";
 
 export interface ConsoleInitialInfo {
     title: string;
@@ -27,7 +27,7 @@ export class Console {
     /**
      * <Emoji Resolvable, Button Info>
      */
-    features: Collection<EmojiIdentifierResolvable, Feature>;
+    features: Collection<string, Feature>;
 
     private _collector?: ReactionCollector;
     private _message?: Message;
@@ -45,7 +45,8 @@ export class Console {
             this.title = title;
             this.description = description;
             this.channel = channel;
-            this.color = `#${color}`;
+            if (color.startsWith('#')) this.color = color as HexColorString;
+            else this.color = `#${color}`;
             this.collectorOptions = collectorOptions;
             
             this.collectorOptions.dispose = true;
@@ -60,11 +61,11 @@ export class Console {
     }
 
     get collector() {
-        if (!this.initialized) throw "The console has not been initialized!";
+        if (!this.initialized) throw "The console has not been initialized! Cant get collector!";
         return this._collector!;
     }
     get message() {
-        if (!this.initialized) throw "The console has not been initialized!";
+        if (!this.initialized) throw "The console has not been initialized! Cant get message!";
         return this._message!;
     }
 
@@ -74,7 +75,7 @@ export class Console {
      * @async
      * @returns Promise that will resolve when all emojis are added to the message
      */
-     async sendConsole(messageText: string = '') {
+     async sendConsole(messageText?: string) {
         let embed = new MessageEmbed().setColor(this.color)
             .setTimestamp()
             .setTitle(this.title)
@@ -109,24 +110,24 @@ export class Console {
      */
      createReactionCollector(message: Message) {
         // make sure we don't have two collectors going!
-        if (this.collector) this.stopConsole();
+        if (this._collector) this.stopConsole();
         
         this.collectorOptions.filter = (reaction, user) => !user.bot && 
-        this.features.has(reaction.emoji) &&
+        this.features.has(reaction.emoji.name || reaction.emoji.identifier) &&
         !this.usersInteracting.has(user.id);
 
         this._collector = message.createReactionCollector(this.collectorOptions);
 
         this._collector.on('collect', (reaction, user) => {
             this.usersInteracting.set(user.id, user);
-            let feature = this.features.get(reaction.emoji);
+            let feature = this.features.get(reaction.emoji.name || reaction.emoji.identifier);
             feature?.callback(user, reaction, () => this.stopInteracting(user), this);
             if (this.channel.type != 'DM' && !feature?.removeCallback)
                 reaction.users.remove(user);
         });
 
         this._collector.on('remove', (reaction, user) => {
-            let feature = this.features.get(reaction.emoji);
+            let feature = this.features.get(reaction.emoji.name || reaction.emoji.identifier);
             if (feature && feature?.removeCallback) {
                 this.usersInteracting.set(user.id, user);
                 feature?.removeCallback(user, reaction, () => this.stopInteracting(user), this);
@@ -150,9 +151,9 @@ export class Console {
             feature.emojiResolvable = RandomEmoji();
         }
 
-        this.features.set(feature.emojiResolvable, feature);
+        this.features.set(feature.emojiId, feature);
 
-        if (this.message) {
+        if (this.initialized) {
             return Promise.all(
                 [
                     this.message.edit({embeds: [this.message.embeds[0].addField(
@@ -176,10 +177,10 @@ export class Console {
             let isDone = this.features.delete(identifier);
             if (!isDone) {
                 let feature = this.features.find(feature => feature.name === identifier);
-                if (feature) this.features.delete(feature.emojiResolvable);
+                if (feature) this.features.delete(feature.emojiId);
             }
         } else if (typeof identifier === 'object' && identifier instanceof Feature) {
-            this.features.delete(identifier.emojiResolvable);
+            this.features.delete(identifier.emojiId);
         } else {
             throw Error(`Was not given an identifier to work with when deleting a feature from this console ${this.title}`);
         }
@@ -194,19 +195,21 @@ export class Console {
      */
     addField(name: string, value: string, inline?: boolean) {
         this.fields.set(name, value);
-        if(this.message) return this.message.edit({embeds: [this.message.embeds[0].addField(name, value, inline)]});
+        if(this.initialized) return this.message.edit({embeds: [this.message.embeds[0].addField(name, value, inline)]});
         return Promise.resolve();
     }
 
     /**
      * Changes the console's color.
-     * @param {String} color - the new color in hex
+     * @param {String} color - the new color in hex, without #
      * @returns Promise that will resolve to the edited message with changed color
      */
     changeColor(color: string) {
-        let colorResolvable: ColorResolvable = `#${color}`;
+        let colorResolvable: ColorResolvable;
+        if (color.startsWith('#')) colorResolvable = color as HexColorString;
+        else colorResolvable = `#${color}`;
         this.color = colorResolvable;
-        if (this.message) return this.message.edit({embeds: [this.message.embeds[0].setColor(this.color)]});
+        if (this.initialized) return this.message.edit({embeds: [this.message.embeds[0].setColor(this.color)]});
         return Promise.resolve();
     }
 
@@ -214,7 +217,7 @@ export class Console {
      * Stop the console from interacting with any users.
      */
     stopConsole() {
-        this.collector?.stop();
+        this._collector?.stop();
     }
 
     /**
@@ -222,7 +225,9 @@ export class Console {
      */
     delete() {
         this.stopConsole();
-        return this.message?.delete();
+        if (this.initialized)
+            return this.message.delete();
+        else return;
     }
 
     /**
@@ -240,14 +245,14 @@ export class Console {
      * @returns Promise that resolves when the reaction is added
      */
     private addReactionToMessage(feature: Feature) {
-        if (!this.message) return Promise.resolve();
+        if (!this.initialized) return Promise.resolve();
 
         return this.message.react(feature.emojiResolvable).catch(() => {
             // the emoji is probably custom and its unavailable, so use a random emoji!
             let emoji = RandomEmoji();
             // enusre the feature keeps the emoji
             feature.emojiResolvable = emoji;
-            return this.message!.react(feature.emojiResolvable);
+            return this.message.react(feature.emojiResolvable);
         });
     }
 

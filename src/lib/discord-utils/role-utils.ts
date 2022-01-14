@@ -28,7 +28,7 @@ export function addRoleToMember(member: GuildMember, addRole: RoleResolvable) {
         return;
     }
 
-    member.roles.add(addRole).catch(error => {
+    let memberPromise = member.roles.add(addRole).catch(error => {
         discordLog(member.guild, '@everyone The member <@' + member.id + '> did not get the role <@&' + role?.id +'> please help me!');
         winston.loggers.get(member.guild.id).error(
             `Could not give the member with id ${member.id} the role ${role?.name} with id ${role?.id}. The following error ocurred: ${error.name} - ${error.message}.`, 
@@ -36,6 +36,7 @@ export function addRoleToMember(member: GuildMember, addRole: RoleResolvable) {
         );
     });
     winston.loggers.get(member.guild.id).verbose(`A member with id ${member.id} was given the role ${role.name} with id ${role.id}`);
+    return memberPromise;
 }
 
 /**
@@ -53,7 +54,7 @@ export function removeRoleToMember(member: GuildMember, removeRole: RoleResolvab
         return;
     }
 
-    member.roles.remove(removeRole).catch(error => {
+    let memberPromise = member.roles.remove(removeRole).catch(error => {
         discordLog(member.guild, '@everyone The member <@' + member.user.id + 
                 '> did not loose the role ' + member.guild.roles.resolve(removeRole)?.id + ', please help me!'
             );
@@ -62,6 +63,7 @@ export function removeRoleToMember(member: GuildMember, removeRole: RoleResolvab
             );
     });
     winston.loggers.get(member.guild.id).verbose(`A member with id ${member.id} lost the role ${role.name} with id ${role.id}`);
+    return memberPromise;
 }
 
 /**
@@ -70,7 +72,7 @@ export function removeRoleToMember(member: GuildMember, removeRole: RoleResolvab
  * @param removeRole - role to remove
  * @param addRole - role to add
  */
-export function replaceRoleToMember(member: GuildMember, removeRole: RoleResolvable, addRole: RoleResolvable) {
-    addRoleToMember(member, addRole);
-    removeRoleToMember(member, removeRole);
+export async function replaceRoleToMember(member: GuildMember, removeRole: RoleResolvable, addRole: RoleResolvable) {
+    await addRoleToMember(member, addRole);
+    await removeRoleToMember(member, removeRole);
 }

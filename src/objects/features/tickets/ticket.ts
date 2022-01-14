@@ -73,7 +73,7 @@ export class Ticket {
          * The room this ticket will be solved in.
          */
         this._room = ticketManager.systemWideTicketInfo.isAdvancedMode ? 
-            new Room(ticketManager.parent.guild, ticketManager.parent.botGuild, `Ticket-${ticketNumber}`, new Collection(), hackers.clone()) : 
+            new Room(ticketManager.parent.guild, `Ticket-${ticketNumber}`, new Collection(), hackers.clone()) : 
             undefined;
 
         /**
@@ -187,7 +187,7 @@ export class Ticket {
                 else await this.basicTakenStatusCallback(user);
                 break;
             case TicketStatus.closed:
-                this.delete(reason);
+                await this.delete(reason);
                 break;
         }
     }
@@ -202,7 +202,7 @@ export class Ticket {
             title: ticketManagerMsgEmbed.title!,
             description: ticketManagerMsgEmbed.description!,
             channel: this.ticketManager.ticketDispatcherInfo.channel,
-            color: '#fff536'
+            color: 'fff536'
         });
 
         ticketManagerMsgEmbed.fields.forEach((embedField => {
@@ -267,7 +267,7 @@ export class Ticket {
 
         // edit ticket manager helper console with mentor information
         await this.ticketManagerConsole.addField('This ticket is being handled!', `<@${helper.id}> is helping this team!`);
-        await this.ticketManagerConsole.changeColor('#36c3ff');
+        await this.ticketManagerConsole.changeColor('36c3ff');
 
         // update dm with user to reflect that their ticket has been accepted
         this.groupLeaderConsole.addField('Your ticket has been taken by a helper!', 'Expect a DM from a helper soon!');
@@ -286,7 +286,7 @@ export class Ticket {
 
         // edit ticket manager helper console with mentor information
         await this.ticketManagerConsole.addField('This ticket is being handled!', `<@${helper.id}> is helping this team!`);
-        await this.ticketManagerConsole.changeColor('#36c3ff');
+        await this.ticketManagerConsole.changeColor('36c3ff');
 
         let takeTicketFeature = new Feature({
             name: 'Still want to help?',
@@ -335,7 +335,7 @@ export class Ticket {
                     this.helpers.delete(user.id);
                     this.group.delete(user.id);
 
-                    this.room.removeUserAccess(user);
+                    await this.room.removeUserAccess(user);
 
                     // if all hackers are gone, delete ticket channels
                     if (this.group.size === 0) {
@@ -465,7 +465,7 @@ export class Ticket {
             'Ticket Closed', 
             `This ticket has been closed${reason ? ' due to ' + reason : '!! Good job!'}`
         );
-        this.ticketManagerConsole.changeColor('#43e65e');
+        this.ticketManagerConsole.changeColor('43e65e');
         this.ticketManagerConsole.stopConsole();
         
         this.groupLeaderConsole.addField(
@@ -473,10 +473,11 @@ export class Ticket {
             `Your ticket was closed due to ${reason}. If you need more help, please request another ticket!`
         );
         this.groupLeaderConsole.stopConsole();
-
-        // delete the room, clear intervals
-        if (this.room) this.room.delete();
         
         if (this.consoles?.ticketRoom) this.ticketRoomConsole.stopConsole();
+
+        // delete the room, clear intervals
+        if (this.room) return this.room.delete();
+        return Promise.resolve();
     }
 }

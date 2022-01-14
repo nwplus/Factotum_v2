@@ -1,4 +1,5 @@
 import type { EmojiIdentifierResolvable, GuildMember, MessageReaction, PermissionOverwriteOptions, Snowflake, User } from "discord.js";
+import type { Console } from '../objects/ui/console/console';
 
 /**
  * An object with a role and its permissions.
@@ -12,10 +13,10 @@ import type { EmojiIdentifierResolvable, GuildMember, MessageReaction, Permissio
  * The function to be called when a feature is activated.
  */
  export type FeatureCallback = (user: User, reaction: MessageReaction,
-    stopInteracting: Function, console: any) => Promise<void>;
+    stopInteracting: Function, console: Console) => Promise<void>;
 
 export type StopInteractingCallback = (user: User, reaction: MessageReaction,
-    stopInteracting: Function, console: any) => void;
+    stopInteracting: Function, console: Console) => void;
 
 export type ShuffleFilter = (member: GuildMember) => boolean;
 

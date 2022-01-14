@@ -1,8 +1,9 @@
 import winston from 'winston';
 import { Collection, GuildMember, MessageEmbed } from 'discord.js';
-import { sendMessageToMember } from 'lib/discord-utils/discord-utils';
-import { addRoleToMember, replaceRoleToMember } from 'lib/discord-utils/role-utils';
-import type { Activity } from 'objects/activities/activity';
+import { sendMessageToMember } from '../../../lib/discord-utils/discord-utils';
+import { addRoleToMember, replaceRoleToMember } from '../../../lib/discord-utils/role-utils';
+import type { Activity } from '../../../objects/activities/activity';
+import type { BotGuild } from '../../../objects/bot-guild';
 
 export class StampManager {
 
@@ -13,7 +14,7 @@ export class StampManager {
      * @param botGuild
      * @async
      */
-     static async distributeStamp(activity: Activity, botGuild: BotGuildModel, time: number = 60) {
+     static async distributeStamp(activity: Activity, botGuild: BotGuild, time: number = 60) {
 
         // winston.loggers.get(activity.guild.id).event(`Activity named ${activity.name} is distributing stamps.`, {event: 'Activity Manager'});
         
@@ -54,10 +55,10 @@ export class StampManager {
      * Upgrade the stamp role of a member.
      * @param {GuildMember} member - the member to add the new role to
      * @param {String} activityName - the name of the activity
-     * @param {BotGuildModel} botGuild
+     * @param botGuild
      * @throws Error if the botGuild has stamps disabled
      */
-    static parseRole(member: GuildMember, activityName: string, botGuild: BotGuildModel) {
+    static parseRole(member: GuildMember, activityName: string, botGuild: BotGuild) {
         if (!botGuild.stamps.isEnabled) {
             winston.loggers.get(botGuild._id).error(`Stamp system is turned off for guild ${botGuild._id} but I was asked to parse a role for member ${member.id} for activity ${activityName}.`, { event: 'Activity Manager' });
             throw Error(`Stamp system is turned of for guild ${botGuild._id} but I was asked to parse a role for member ${member.id} for activity ${activityName}.`);
@@ -66,7 +67,7 @@ export class StampManager {
         let role = member.roles.cache.find(role => botGuild.stamps.stampRoleIDs.has(role.id));
 
         if (role === undefined) {
-            addRoleToMember(member, botGuild.stamps.stamp0thRoleId);
+            addRoleToMember(member, botGuild.stamps.stamp0thRoleId!);
             sendMessageToMember(member, 'I did not find an existing stamp role for you so I gave you one for attending '
                 + activityName + '. Please contact an admin if there was a problem.', true);
             // winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} tried to give a stamp to the user with id ${member.id} but he has no stamp, I gave them the first stamp!`, {event: 'Activity Manager'});
@@ -74,22 +75,24 @@ export class StampManager {
         }
 
         let stampNumber = botGuild.stamps.stampRoleIDs.get(role.id);
-        if (stampNumber === botGuild.stamps.stampRoleIDs.size - 1) {
+        if (stampNumber && stampNumber === botGuild.stamps.stampRoleIDs.size - 1) {
             sendMessageToMember(member, 'You already have the maximum allowed number of stamps!', true);
             // winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} tried to give a stamp to the user with id ${member.id} but he is already in the max stamp ${stampNumber}`, {event: 'Activity Manager'});
             return;
-        }
-        let newRoleID;
+        } else if (stampNumber) {
+            let newRoleID;
 
-        botGuild.stamps.stampRoleIDs.forEach((num, key, _map) => {
-            if (num === stampNumber + 1) newRoleID = key;
-        });
+            botGuild.stamps.stampRoleIDs.forEach((num, key, _map) => {
+                if (num === stampNumber! + 1) newRoleID = key;
+            });
 
-        if (newRoleID != undefined) {
-            replaceRoleToMember(member, role.id, newRoleID);
-            sendMessageToMember(member, 'You have received a higher stamp for attending ' + activityName + '!', true);
-            // winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} gave a stamp to the user with id ${member.id} going from stamp number ${stampNumber} to ${stampNumber + 1}`, {event: 'Activity Manager'});
+            if (newRoleID != undefined) {
+                replaceRoleToMember(member, role.id, newRoleID);
+                sendMessageToMember(member, 'You have received a higher stamp for attending ' + activityName + '!', true);
+                // winston.loggers.get(botGuild._id).userStats(`Activity named ${activityName} gave a stamp to the user with id ${member.id} going from stamp number ${stampNumber} to ${stampNumber + 1}`, {event: 'Activity Manager'});
+            }
         }
+        
     }
 
 }

@@ -19,7 +19,9 @@ import { ColorResolvable, Guild, GuildMember, Message, MessageEmbed, MessageOpti
         '<@' + userId + '> ' + message :
         message
         );
-	await new Promise(() => setTimeout(() => message_1.delete(), timeout * 1000));
+	await new Promise(() => setTimeout(() => {
+        if (message_1.channel && message_1.deletable) message_1.delete();
+    }, timeout * 1000));
 
 	return message_1;
 
@@ -38,7 +40,9 @@ import { ColorResolvable, Guild, GuildMember, Message, MessageEmbed, MessageOpti
     return member.send(message).then(msg => {
         winston.loggers.get(member.guild.id || 'main').verbose(`A DM message was sent to user with id ${member.id}.`);
         if (isDelete === true) {
-            return new Promise(() => setTimeout(() => msg.delete(), 6000)) as Promise<Message<boolean>>;
+            return new Promise(() => setTimeout(() => {
+                if (msg.channel && msg.deletable) msg.delete();
+            }, 6000)) as Promise<Message<boolean>>;
         }
         return msg;
     }).catch(async error => {
@@ -94,11 +98,11 @@ export type EmbedOptions = {
 
 /**
  * Log a message on the log channel
- * @param guild - the guild being used
- * @param message - message to send to the log channel
+ * @param _guild - the guild being used
+ * @param _message - message to send to the log channel
  * @async
  */
- export async function discordLog(guild: Guild, message: string | MessagePayload | MessageOptions) {
+ export async function discordLog(_guild: Guild, _message: string | MessagePayload | MessageOptions) {
     /* let botGuild; // await BotGuild.findById(guild.id); TODO fix!
     if (botGuild.channelIDs.adminLog) {
         let adminLogChannel = guild.channels.cache.get(botGuild.channelIDs.adminLog);

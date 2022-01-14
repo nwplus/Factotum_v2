@@ -3,7 +3,6 @@ import { Console } from "../../ui/console/console";
 import { Ticket, TicketStatus } from "./ticket";
 import type { Activity } from "../../activities/activity";
 import { MessagePrompt } from "advanced-discord.js-prompts";
-import winston from "winston";
 import { Feature } from "../../ui/console/feature";
 import { sendMessageToChannel } from "../../../lib/discord-utils/discord-utils";
 
@@ -135,7 +134,7 @@ export type MultiRoleInfo = {
                 name: 'General Ticket',
                 description: 'A general ticket aimed to all helpers.',
                 emojiResolvable: this.ticketDispatcherInfo.mainHelperInfo.emoji,
-                callback: (user, _reaction, stopInteracting, console) => this.startTicketCreationProcess(user, this.ticketDispatcherInfo.mainHelperInfo.role, console.channel).then(() => stopInteracting()),
+                callback: (user, _reaction, stopInteracting, console) => this.startTicketCreationProcess(user, this.ticketDispatcherInfo.mainHelperInfo.role, console.channel as TextChannel).then(() => stopInteracting()),
             })
         ];
 
@@ -159,7 +158,7 @@ export type MultiRoleInfo = {
                 description: '---------------------------------',
                 emojiResolvable: emoji,
                 callback: (user, _reaction, stopInteracting, console) => {
-                    return this.startTicketCreationProcess(user, role, console.channel).then(() => stopInteracting());
+                    return this.startTicketCreationProcess(user, role, console.channel as TextChannel).then(() => stopInteracting());
                 }
             })
         );
@@ -189,7 +188,7 @@ export type MultiRoleInfo = {
             var promptMsg = await MessagePrompt.prompt({prompt: 'Please send ONE message with: \n* A one liner of your problem ' + 
                                 '\n* Mention your team members using @friendName (example: @John).', channel, userId: user.id, cancelable: true, time: 45});
         } catch (error) {
-            winston.loggers.get(this.parent.botGuild._id).warning(`New ticket was canceled due to error: ${error}`, { event: 'Ticket Manager' });
+            // winston.loggers.get(this.parent.botGuild._id).warning(`New ticket was canceled due to error: ${error}`, { event: 'Ticket Manager' });
             return;
         }
 
@@ -226,7 +225,7 @@ export type MultiRoleInfo = {
         if (this.ticketDispatcherInfo.reminderInfo.isEnabled) {
             let timeout = setTimeout(() => {
                 if (ticket.status === TicketStatus.open) {
-                    ticket.ticketManagerConsole.changeColor('#ff5736');
+                    ticket.ticketManagerConsole.changeColor('ff5736');
                     sendMessageToChannel({
                         channel: this.ticketDispatcherInfo.channel,
                         message: `Hello <@&${this.ticketDispatcherInfo.mainHelperInfo.role.id}> ticket number ${ticket.id} still needs help!`,
@@ -259,9 +258,9 @@ export type MultiRoleInfo = {
         if (excludeTicketIds.length > 0) ticketsToRemove = this.tickets.filter((_ticket, ticketId) => excludeTicketIds.includes(ticketId));
         else ticketsToRemove = this.tickets;
 
-        ticketsToRemove.forEach((_ticket, ticketId) => {
-            this.removeTicket(ticketId);
-        });
+        return Promise.all(ticketsToRemove.map((_ticket, ticketId) => {
+            return this.removeTicket(ticketId);
+        }));
     }
 
     /**
@@ -306,7 +305,8 @@ export type MultiRoleInfo = {
         }
         let ticket = this.tickets.get(ticketId);
         if (ticket) {
-            ticket.setStatus(TicketStatus.closed, 'ticket manager closed the ticket');
+            return ticket.setStatus(TicketStatus.closed, 'ticket manager closed the ticket');
         }
+        return Promise.resolve();
     }
 }
