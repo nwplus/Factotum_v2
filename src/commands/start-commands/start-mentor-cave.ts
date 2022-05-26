@@ -24,7 +24,7 @@ export class StartMentorCave extends Command {
             if (!message.member) return;
             const userId = message.member.user.id;
 
-            /* const botGuild = new BotGuild(
+            const botGuild = new BotGuild(
                 {
                     memberRole: "930018053343830016",
                     everyoneRole: "926230251422511206",
@@ -38,22 +38,6 @@ export class StartMentorCave extends Command {
                     archiveCategory: "930018180263469166",
                 },
                 "926230251422511206"
-            ); */
-
-            const botGuild = new BotGuild(
-                {
-                    memberRole: "931493780878671883",
-                    everyoneRole: "923741360132087819",
-                    staffRole: "931493780878671883",
-                    adminRole: "931493780878671883",
-                },
-                {
-                    adminConsole: "923741360132087822",
-                    adminLog: "923741360132087822",
-                    botSupportChannel: "923741360132087822",
-                    archiveCategory: "923741360132087822",
-                },
-                "923741360132087819"
             );
 
             botGuild.stamps = {
